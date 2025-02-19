@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QMessageBox>
+#include <QCheckBox>
 
 class FileProcessorGUI : public QWidget {
     Q_OBJECT
@@ -60,24 +61,37 @@ private slots:
             }
             inputFile.close();
 
-            QString outputPath = fileOutput->text() + "/onlineLaTeX.bat";
-            QFile outputFile(outputPath);
-            if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                throw std::runtime_error("无法创建输出文件");
+            if (generateBatCheckBox->isChecked()) {
+                QString outputPath = QDir::toNativeSeparators(
+                    fileOutput->text() + QDir::separator() + "onlineLaTeX.bat"
+                );
+    
+                QFile outputFile(outputPath);
+                if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                    throw std::runtime_error("无法创建输出文件");
+                }
+    
+                QTextStream out(&outputFile);
+                out.setEncoding(QStringConverter::Utf8);
+                out << "@echo off\n";
+    
+                QString url = "https://texlive.net/run?" + QUrl::toPercentEncoding(content);
+                QString command = "start " + url.replace("%", "%%");
+                out << command;
+                outputFile.close();
             }
-
-            QTextStream out(&outputFile);
-            out.setEncoding(QStringConverter::Utf8);
-            out << "@echo off\n";
-
+    
+            // 显示结果
             QString url = "https://texlive.net/run?" + QUrl::toPercentEncoding(content);
-            QString command = "start " + url.replace("%", "%%");
-            out << command;
-            outputFile.close();
-
-            outputArea->setText(
-                QString("处理完成，输出文件地址生成的onlineLaTeX.bat文件可以一键打开在线分享的网址，具体网址为\n\n%1")
-                .arg(url));
+            if (generateBatCheckBox->isChecked()) {
+                outputArea->setText(
+                    QString("处理完成，输出文件地址生成的 onlineLaTeX.bat 文件可以一键打开在线分享的网址，具体网址为\n\n%1")
+                    .arg(url));
+            } else {
+                outputArea->setText(
+                    QString("处理完成，在线分享的网址为\n\n%1")
+                    .arg(url));
+            }
         } catch (const std::exception& e) {
             outputArea->setText(QString("处理出错：%1").arg(e.what()));
         }
@@ -97,10 +111,13 @@ private slots:
 private:
     void initUI() {
         // 创建组件
-        QLabel *fileLabel = new QLabel("文件路径:      ");
+        QLabel *fileLabel = new QLabel("文件路径:");
         QLabel *outputLabel = new QLabel("输出.bat文件路径");
         fileInput = new QLineEdit();
         fileOutput = new QLineEdit();
+
+        generateBatCheckBox = new QCheckBox("生成能一键开启在线浏览的 .bat 文件", this);
+        generateBatCheckBox->setChecked(true);
         QPushButton *browseBtn = new QPushButton("浏览...");
         QPushButton *browseOutBtn = new QPushButton("浏览...");
         QPushButton *processBtn = new QPushButton("处理文件");
@@ -121,6 +138,7 @@ private:
 
         QVBoxLayout *mainLayout = new QVBoxLayout();
         mainLayout->addLayout(fileLayout);
+        mainLayout->addWidget(generateBatCheckBox);
         mainLayout->addLayout(outputLayout);
         mainLayout->addWidget(processBtn);
         mainLayout->addWidget(copyBtn);
@@ -140,6 +158,7 @@ private:
     QLineEdit *fileInput;
     QLineEdit *fileOutput;
     QTextEdit *outputArea;
+    QCheckBox *generateBatCheckBox;
 };
 
 #include "main.moc"
